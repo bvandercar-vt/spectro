@@ -97,10 +97,7 @@ def show(
 
     channels = range(out.shape[1]) if channel is None else [channel - 1]
 
-    if num_windows is None:
-        nperseg = None
-    else:
-        nperseg = int(round(track.duration_seconds / num_windows * track.frame_rate))
+    nperseg = None if num_windows is None else int(round(track.duration_seconds / num_windows * track.frame_rate))
 
     for i, k in enumerate(channels):
         f, t, Sxx = get_spectrum(out, k, track, nperseg, num_frequencies)
@@ -126,7 +123,7 @@ def show(
         plt.savefig(outfile, transparent=True, bbox_inches="tight")
 
 
-def check(path: FilePath, **kwargs):
+def check_dir(path: FilePath, **kwargs):
     path = pathlib.Path(path)
     if path.is_file():
         _check_file(path, **kwargs)
@@ -138,24 +135,27 @@ def check(path: FilePath, **kwargs):
             _check_file(p, **kwargs)
 
 
-def _check_file(filename: FilePath, **kwargs):
+def check_file(filename: FilePath, **kwargs):
+    filename = pathlib.Path(filename)
     max_freq = get_max_freq(filename, **kwargs)
 
-    console = Console()
-
-    # What do we expect?
-    # https://stackoverflow.com/a/287944/353337
-    filename = pathlib.Path(filename)
+    console = Console() # colored text to terminal: https://stackoverflow.com/a/287944/353337
+    
     good = False
-    if filename.suffix in [".wav", ".flac"]:
-        if max_freq > 19000:
-            console.print(f"[green]{filename} seems good.")
+
+    def check_and_log(freq_threshold: int, addl_log_str: str = ''):
+        nonlocal good
+        if max_freq > freq_threshold:
+            console.print(f"[green]{filename} seems good{addl_log_str}.")
             good = True
         else:
             console.print(
-                f"[red]{filename} is {'WAV' if filename.suffix == '.wav' else 'FLAC'}, but has max frequency "
-                f"about {max_freq:.0f} Hz. Check with spectro show."
+                f"[red]{filename} is {filename.suffix.upper()}{addl_log_str}, but has max frequency about {max_freq:.0f} Hz. Check with spectro show."
             )
+            good = False
+            
+    if filename.suffix in [".wav", ".flac"]:
+        check_and_log(freq_threshold=19000)
     elif filename.suffix == ".mp3":
         mp3_file = MP3(filename)
         bitrate = int(mp3_file.info.bitrate / 1000)  # type: ignore
@@ -164,16 +164,8 @@ def _check_file(filename: FilePath, **kwargs):
                 break
             expected_max_freq = val
 
-        if max_freq > expected_max_freq:
-            console.print(f"[green]{filename} seems good [{bitrate} kbps].")
-            good = True
-        else:
-            console.print(
-                f"[red]{filename} is MP3 [{bitrate} kbps], but has max frequency "
-                f"about {max_freq:.0f} Hz. Check with speck-show."
-            )
-
+        check_and_log(freq_threshold=expected_max_freq, addl_log_str=f" [{bitrate} kbps]")
     else:
-        console.print(f"[italic]Don't know what to expect for {filename}.")
+        console.print(f"[italic]Don't know what to expect for {filename} extension {filename.suffix}.")
 
     return good, max_freq
