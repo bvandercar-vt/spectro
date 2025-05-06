@@ -60,33 +60,6 @@ def get_spectrum(
     return f, t, Sxx
 
 
-def get_max_freq(
-    filename: FilePath,
-    window_length_s: float = 0.05,
-    # Use the first channel by default
-    channel: int = 0,
-) -> float:
-    track, samples = _get_samples(filename)
-
-    nperseg = (
-        None
-        if window_length_s is None
-        else int(round(window_length_s * track.frame_rate))
-    )
-
-    f, t, Sxx = get_spectrum(
-        samples=samples, channel=channel, fs=track.frame_rate, nperseg=nperseg
-    )
-
-    # Which row surpasses the average first?
-    log_Sxx = numpy.log10(Sxx)
-    avg_log_Sxx = numpy.average(log_Sxx)
-    count = numpy.sum(log_Sxx > avg_log_Sxx, axis=1)
-    max_freq_index = numpy.where(count > log_Sxx.shape[1] / 8)[0][-1]
-    max_freq = f[max_freq_index]
-    return max_freq
-
-
 def show(
     filename: str,
     min_freq: float = 1.0e-2,
@@ -133,6 +106,33 @@ def show(
         plt.show()
     else:
         plt.savefig(outfile, transparent=True, bbox_inches="tight")
+
+
+def get_max_freq(
+    filename: FilePath,
+    window_length_s: float = 0.05,
+    # Use the first channel by default
+    channel: int = 0,
+) -> float:
+    track, samples = _get_samples(filename)
+
+    nperseg = (
+        None
+        if window_length_s is None
+        else int(round(window_length_s * track.frame_rate))
+    )
+
+    f, t, Sxx = get_spectrum(
+        samples=samples, channel=channel, fs=track.frame_rate, nperseg=nperseg
+    )
+
+    # Which row surpasses the average first?
+    log_Sxx = numpy.log10(Sxx)
+    avg_log_Sxx = numpy.average(log_Sxx)
+    count = numpy.sum(log_Sxx > avg_log_Sxx, axis=1)
+    max_freq_index = numpy.where(count > log_Sxx.shape[1] / 8)[0][-1]
+    max_freq = f[max_freq_index]
+    return max_freq
 
 
 def check(path: FilePath, **kwargs):
